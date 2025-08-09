@@ -2,40 +2,25 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"io"
 	"log"
 	"strings"
-	"net"
 )
 
-const ipPort = "127.0.0.1:42069"
+const file = "./messages.txt"
 
 func main() {
-	l, err := net.Listen("tcp", ipPort)
+	f, err := os.Open(file)
 	if err != nil {
-		log.Fatalf("could not open listener on %s: error: %s\n", ipPort, err)
+		log.Fatalf("could not open file %s: error: %s\n", file, err)
 	}
-	defer l.Close()
 
-	for {
-		// Wait for a connection.
-		conn, err := l.Accept()
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("A connection has been accepted...")
-		// Handle the connection in a new goroutine.
-		// The loop then returns to accepting, so that
-		// multiple connections may be served concurrently.
-		go func(c net.Conn) {
-			ch := getLinesChannel(c)
-			
-			for line := range ch {
-				fmt.Println(line)
-			}
-			fmt.Println("The connection has been closed...")
-		}(conn)
-	}	
+	ch := getLinesChannel(f)
+
+	for line := range ch {
+		fmt.Printf("read: %s\n", line)
+	}
 }
 
 func getLinesChannel(f io.ReadCloser) <-chan string {
@@ -50,7 +35,7 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 		for {
 			n, err := f.Read(eightBytes)
 			if err != nil && err != io.EOF {
-				log.Fatal(err)
+				log.Fatalf("could not read from file %s: error: %s\n", file, err)
 			}
 			if n == 0 && err == io.EOF {
 				ch <- line
