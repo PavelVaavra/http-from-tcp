@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 	"net"
+	"github.com/PavelVaavra/http-from-tcp/internal/request"
 )
 
 const ipPort = "127.0.0.1:42069"
@@ -28,11 +29,16 @@ func main() {
 		// The loop then returns to accepting, so that
 		// multiple connections may be served concurrently.
 		go func(c net.Conn) {
-			ch := getLinesChannel(c)
-			
-			for line := range ch {
-				fmt.Println(line)
+			r, err := request.RequestFromReader(c)
+			if err != nil {
+				log.Fatalf("could not parse HTTP request: error: \n", err)
 			}
+
+			fmt.Println("Request line:")
+			fmt.Printf("- Method: %s\n", r.RequestLine.Method)
+			fmt.Printf("- Target: %s\n", r.RequestLine.RequestTarget)
+			fmt.Printf("- Version: %s\n", r.RequestLine.HttpVersion)
+
 			fmt.Println("The connection has been closed...")
 		}(conn)
 	}	
