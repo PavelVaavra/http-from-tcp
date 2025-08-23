@@ -4,12 +4,13 @@ import (
 	"io"
 	"strings"
 	"errors"
+	"github.com/PavelVaavra/http-from-tcp/internal/headers"
+	// "fmt"
 )
 
 type Request struct {
 	RequestLine RequestLine
-	// 0..initialized
-	// 100..done
+	Headers headers.Headers
 	State requestState
 }
 
@@ -17,6 +18,7 @@ type requestState int
 
 const (
 	requestStateInitialized requestState = iota
+	requestStateParsingHeaders
 	requestStateDone
 )
 
@@ -37,7 +39,21 @@ func (r *Request) parse(data []byte) (int, error) {
 			return 0, nil
 		}
 		r.RequestLine = *rl
-		r.State = requestStateDone
+		r.State = requestStateParsingHeaders
+		return n, nil
+	} else if r.State == requestStateParsingHeaders {
+		// fmt.Printf("\"%v|\n", string(data))
+		n, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+		if n == 0 && err == nil {
+			return 0, nil
+		}
+		if done && err == nil {
+			r.State = requestStateDone
+			return n, nil
+		}
 		return n, nil
 	} else if r.State == requestStateDone {
 		return 0,  errors.New("error: trying to read data in a done state")
@@ -91,6 +107,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 	req := Request{
 		RequestLine: RequestLine{},
+		Headers: headers.Headers{},
 		State: requestStateInitialized,
 	}
 	
@@ -108,7 +125,10 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		if err != nil {
 			return nil, err
 		}
-		readToIndex -= n
+		if n != 0 {
+			copy(buff, buff[n:])
+			readToIndex -= n
+		}
 	}
 	
 	return &req, nil
