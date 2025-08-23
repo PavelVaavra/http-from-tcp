@@ -21,7 +21,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	if len(parts) != 2 {
 		return 0, false, errors.New("No colon found.")
 	}
-	key, value := parts[0], parts[1]
+	key, value := strings.ToLower(parts[0]), parts[1]
 	if len(key) == 0 {
 		return 0, false, errors.New("No key value.")
 	}
@@ -31,7 +31,24 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, errors.New("There is a whitespace between key and colon.")
 	}
 	key = strings.TrimSpace(key)
+	if !isValid(key) {
+		return 0, false, errors.New("Key contains an invalid character.")
+	}
 	value = strings.TrimSpace(value)
 	h[key] = value
 	return len(headerLine[0]) + len("\r\n"), false, nil
+}
+
+func isValid(s string) bool {
+	for _, r := range s {
+		switch {
+		case unicode.IsLower(r),
+			unicode.IsDigit(r),
+			strings.ContainsRune("!#$%&'*+-.^_`|~", r):
+			// allowed
+		default:
+			return false
+		}
+	}
+	return true
 }
