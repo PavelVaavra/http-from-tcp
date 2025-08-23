@@ -35,7 +35,12 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, errors.New("Key contains an invalid character.")
 	}
 	value = strings.TrimSpace(value)
-	h[key] = value
+	v, ok := h[key]
+	if ok {
+		h[key] = v + ", " + value
+	} else {
+		h[key] = value
+	}
 	return len(headerLine[0]) + len("\r\n"), false, nil
 }
 

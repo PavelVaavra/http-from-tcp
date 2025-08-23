@@ -38,6 +38,16 @@ func TestHeadersParse(t *testing.T) {
 	assert.Equal(t, 25, n)
 	assert.False(t, done)
 
+	// Test: Header with multiple values
+	headers = map[string]string{"host": "localhost:42069"}
+	data = []byte("  Host:  127.0.0.1:55364   \r\nAccept: */*\r\n\r\n")
+	n, done, err = headers.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, headers)
+	assert.Equal(t, "localhost:42069, 127.0.0.1:55364", headers["host"])
+	assert.Equal(t, 29, n)
+	assert.False(t, done)
+
 	// Test: Valid done
 	headers = Headers{}
 	data = []byte("\r\n\r\n")
