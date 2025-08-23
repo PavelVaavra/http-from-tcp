@@ -31,7 +31,7 @@ func main() {
 		go func(c net.Conn) {
 			r, err := request.RequestFromReader(c)
 			if err != nil {
-				log.Fatalf("could not parse HTTP request: error: \n", err)
+				log.Fatalf("could not parse HTTP request: error:%v\n", err)
 			}
 
 			fmt.Println("Request line:")
