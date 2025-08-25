@@ -106,7 +106,7 @@ func TestRequestLineParse(t *testing.T) {
 	assert.Equal(t, "HTTP version not equal to 1.1", err.Error())
 }
 
-func TestHeadersParse(t *testing.T) {
+func TestRequestsParse(t *testing.T) {
 	// Test: Standard Headers
 	reader := &chunkReader{
 		data:            "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",

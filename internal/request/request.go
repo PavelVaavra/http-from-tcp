@@ -29,7 +29,8 @@ type RequestLine struct {
 	Method        string
 }
 
-func (r *Request) parse(data []byte) (int, error) {
+func (r *Request) parseSingle(data []byte) (int, error) {
+	// fmt.Printf("\"%v|\n", string(data))
 	if r.State == requestStateInitialized {
 		rl, n, err := parseRequestLine(string(data))
 		if err != nil {
@@ -42,7 +43,6 @@ func (r *Request) parse(data []byte) (int, error) {
 		r.State = requestStateParsingHeaders
 		return n, nil
 	} else if r.State == requestStateParsingHeaders {
-		// fmt.Printf("\"%v|\n", string(data))
 		n, done, err := r.Headers.Parse(data)
 		if err != nil {
 			return 0, err
@@ -62,8 +62,22 @@ func (r *Request) parse(data []byte) (int, error) {
 	}
 }
 
+func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.State != requestStateDone {
+		n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return 0, err
+		}
+		if n == 0 && err == nil {
+			return totalBytesParsed, nil
+		}
+		totalBytesParsed += n
+	}
+	return totalBytesParsed, nil
+}
+
 func parseRequestLine(s string) (*RequestLine, int, error) {
-	// fmt.Printf("\"%v\"\n", s)
 	requestLine := strings.Split(s, "\r\n")
 	// \r\n wasn't found
 	if len(requestLine) == 1 {
