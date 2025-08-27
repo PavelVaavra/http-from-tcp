@@ -131,8 +131,9 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		}
 		n, err := reader.Read(buff[readToIndex:])
 		if n == 0 && err == io.EOF {
-			req.State = requestStateDone
-			continue
+			if req.State != requestStateDone {
+				return nil, errors.New("Incomplete request.")
+			}
 		}
 		readToIndex += n
 		n, err = req.parse(buff[:readToIndex])
