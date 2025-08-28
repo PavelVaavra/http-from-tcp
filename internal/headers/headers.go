@@ -8,6 +8,14 @@ import (
 
 type Headers map[string]string
 
+func (h Headers) Get(key string) (value string, err error) {
+	v, ok := h[strings.ToLower(key)]
+	if !ok {
+		return "", errors.New("Key doesn't exist.")
+	}
+	return v, nil
+}
+
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	if strings.HasPrefix(string(data), "\r\n") {
 		return len("\r\n"), true, nil

@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 	"errors"
+	"strconv"
 	"github.com/PavelVaavra/http-from-tcp/internal/headers"
 	// "fmt"
 )
@@ -11,6 +12,7 @@ import (
 type Request struct {
 	RequestLine RequestLine
 	Headers headers.Headers
+	Body []byte
 	State requestState
 }
 
@@ -19,6 +21,7 @@ type requestState int
 const (
 	requestStateInitialized requestState = iota
 	requestStateParsingHeaders
+	requestStateParsingBody
 	requestStateDone
 )
 
@@ -51,10 +54,26 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 			return 0, nil
 		}
 		if done && err == nil {
-			r.State = requestStateDone
+			r.State = requestStateParsingBody
 			return n, nil
 		}
 		return n, nil
+	} else if r.State == requestStateParsingBody {
+		contentLengthStr, err := r.Headers.Get("content-length")
+		if contentLengthStr == "" && err != nil {
+			r.State = requestStateDone
+			return len(data), nil
+		}
+		r.Body = data
+		contentLengthInt, err := strconv.Atoi(contentLengthStr)
+		if err != nil {
+			return 0, errors.New("Content-Length invalid number.")
+		}
+		if len(r.Body) != contentLengthInt {
+			return 0, errors.New("Content-Length doesn't equal to Body length.")
+		}
+		r.State = requestStateDone
+		return len(r.Body), nil
 	} else if r.State == requestStateDone {
 		return 0,  errors.New("error: trying to read data in a done state")
 	} else {
@@ -69,10 +88,10 @@ func (r *Request) parse(data []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		if n == 0 && err == nil {
+		totalBytesParsed += n
+		if n == 0 && err == nil || r.State == requestStateParsingBody {
 			return totalBytesParsed, nil
 		}
-		totalBytesParsed += n
 	}
 	return totalBytesParsed, nil
 }
@@ -131,18 +150,26 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		}
 		n, err := reader.Read(buff[readToIndex:])
 		if n == 0 && err == io.EOF {
-			if req.State != requestStateDone {
-				return nil, errors.New("Incomplete request.")
+			if req.State != requestStateParsingBody {
+				return nil, errors.New("No requestStateParsingBody after EOF.")
 			}
+			n, err = req.parse(buff[:readToIndex])
+			if err != nil {
+				return nil, err
+			}
+			req.State = requestStateDone
+			continue
 		}
 		readToIndex += n
-		n, err = req.parse(buff[:readToIndex])
-		if err != nil {
-			return nil, err
-		}
-		if n != 0 {
-			copy(buff, buff[n:])
-			readToIndex -= n
+		if req.State != requestStateParsingBody {
+			n, err = req.parse(buff[:readToIndex])
+			if err != nil {
+				return nil, err
+			}
+			if n != 0 {
+				copy(buff, buff[n:])
+				readToIndex -= n
+			}
 		}
 	}
 	
