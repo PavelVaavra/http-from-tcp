@@ -6,22 +6,9 @@ import (
 	"fmt"
 )
 
-// In your new server package, implement the following methods and types (I won't hold your hand too much here):
-// 
-// type Server struct - Contains the state of the server
-// 
-// func Serve(port int) (*Server, error) - Creates a net.Listener and returns a new Server instance. Starts listening for requests inside a goroutine.
-// 
-// func (s *Server) Close() error - Closes the listener and the server
-// 
-// func (s *Server) listen() - Uses a loop to .Accept new connections as they come in, and handles each one in a new goroutine. I used an atomic.Bool to 
-// track whether the server is closed or not so that I can ignore connection errors after the server is closed.
-// 
-// func (s *Server) handle(conn net.Conn) - Handles a single connection by writing the following response and then closing the connection:
-
 type Server struct {
-	State atomic.Bool
-	Server net.Listener
+	State atomic.Bool //0..closed, 1..open
+	Listener net.Listener
 }
 
 func Serve(port int) (*Server, error) {
@@ -30,7 +17,7 @@ func Serve(port int) (*Server, error) {
 		return nil, err
 	}
 	server := Server {
-		Server: l,
+		Listener: l,
 	}
 	server.State.Store(true)
 	go server.listen()
@@ -39,18 +26,18 @@ func Serve(port int) (*Server, error) {
 }
 
 func (s *Server) Close() error {
-	err := s.Server.Close()
+	s.State.Store(false)
+	err := s.Listener.Close()
 	if err != nil {
 		return err
 	}
-	s.State.Store(false)
 	return nil
 }
 
 func (s *Server) listen() {
 	for {
 		// Wait for a connection.
-		conn, err := s.Server.Accept()
+		conn, err := s.Listener.Accept()
 		if err != nil {
 			if !s.State.Load() {
 				return
