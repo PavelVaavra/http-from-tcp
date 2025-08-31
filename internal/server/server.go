@@ -51,8 +51,13 @@ func (s *Server) listen() {
 	for {
 		// Wait for a connection.
 		conn, err := s.Server.Accept()
-		if err != nil && s.State.Load() {
-			fmt.Println(err.Error())
+		if err != nil {
+			if !s.State.Load() {
+				return
+			} else {
+				fmt.Println(err.Error())
+				continue
+			}
 		}
 		fmt.Println("A connection has been accepted...")
 		go s.handle(conn)
