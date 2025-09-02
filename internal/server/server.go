@@ -4,6 +4,7 @@ import (
 	"net"
 	"sync/atomic"
 	"fmt"
+	"github.com/PavelVaavra/http-from-tcp/internal/response"
 )
 
 type Server struct {
@@ -51,12 +52,19 @@ func (s *Server) listen() {
 	}
 }
 
+// Update the handle method in your server package to use these new functions and methods to return our "default" response:
 func (s *Server) handle(conn net.Conn) {
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n" +
-		"Content-Type: text/plain\r\n" +
-		"Content-Length: 13\r\n" +
-		"\r\n" +
-		"Hello World!\n"))
+	err := response.WriteStatusLine(conn, response.OK)
+	if err != nil {
+		return
+	}
+
+	headers := response.GetDefaultHeaders(0)
+
+	err = response.WriteHeaders(conn, headers)
+	if err != nil {
+		return
+	}
 
 	conn.Close()
 	fmt.Println("A connection has been closed...")
