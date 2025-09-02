@@ -16,6 +16,16 @@ func (h Headers) Get(key string) (value string, err error) {
 	return v, nil
 }
 
+func (h Headers) Set(key, value string) {
+	key = strings.ToLower(key)
+	v, ok := h[key]
+	if ok {
+		h[key] = v + ", " + value
+	} else {
+		h[key] = value
+	}
+}
+
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	if strings.HasPrefix(string(data), "\r\n") {
 		return len("\r\n"), true, nil
@@ -43,12 +53,8 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, errors.New("Key contains an invalid character.")
 	}
 	value = strings.TrimSpace(value)
-	v, ok := h[key]
-	if ok {
-		h[key] = v + ", " + value
-	} else {
-		h[key] = value
-	}
+	h.Set(key, value)
+
 	return len(headerLine[0]) + len("\r\n"), false, nil
 }
 

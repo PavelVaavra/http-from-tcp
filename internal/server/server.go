@@ -54,7 +54,7 @@ func (s *Server) listen() {
 
 // Update the handle method in your server package to use these new functions and methods to return our "default" response:
 func (s *Server) handle(conn net.Conn) {
-	err := response.WriteStatusLine(conn, response.OK)
+	err := response.WriteStatusLine(conn, response.StatusCodeOK)
 	if err != nil {
 		return
 	}
