@@ -14,15 +14,15 @@ const (
 	StatusCodeInternalServerError StatusCode = 500 
 )
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+func WriteStatusLine(w io.Writer, statusCode StatusCode, message string) error {
 	statusLine := ""
 	switch statusCode {
 	case StatusCodeOK:
 		statusLine = "HTTP/1.1 200 OK\r\n"
 	case StatusCodeBadRequest:
-		statusLine = "HTTP/1.1 400 Bad Request\r\n"
+		statusLine = "HTTP/1.1 400 " + message + "\r\n"
 	case StatusCodeInternalServerError:
-		statusLine = "HTTP/1.1 500 Internal Server Error\r\n"
+		statusLine = "HTTP/1.1 500 " + message + "\r\n"
 	}
 	_, err := w.Write([]byte(statusLine))
 	return err
