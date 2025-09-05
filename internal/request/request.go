@@ -1,19 +1,22 @@
 package request
 
 import (
-	"io"
-	"strings"
 	"errors"
+	"io"
+	"net"
 	"strconv"
+	"strings"
+	"time"
+
 	"github.com/PavelVaavra/http-from-tcp/internal/headers"
 	// "fmt"
 )
 
 type Request struct {
 	RequestLine RequestLine
-	Headers headers.Headers
-	Body []byte
-	State requestState
+	Headers     headers.Headers
+	Body        []byte
+	State       requestState
 }
 
 type requestState int
@@ -24,7 +27,6 @@ const (
 	requestStateParsingBody
 	requestStateDone
 )
-
 
 type RequestLine struct {
 	HttpVersion   string
@@ -75,9 +77,9 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 		r.State = requestStateDone
 		return len(r.Body), nil
 	} else if r.State == requestStateDone {
-		return 0,  errors.New("error: trying to read data in a done state")
+		return 0, errors.New("error: trying to read data in a done state")
 	} else {
-		return 0,  errors.New("error: unknown state")
+		return 0, errors.New("error: unknown state")
 	}
 }
 
@@ -125,31 +127,34 @@ func parseRequestLine(s string) (*RequestLine, int, error) {
 	}
 
 	return &RequestLine{
-		HttpVersion: httpVersion,
+		HttpVersion:   httpVersion,
 		RequestTarget: requestTarget,
-		Method: method,
+		Method:        method,
 	}, len(requestLine[0]) + len("\r\n"), nil
 }
 
 const bufferSize = 8
 
-func RequestFromReader(reader io.Reader) (*Request, error) {	
+func RequestFromReader(reader io.Reader) (*Request, error) {
 	buff := make([]byte, bufferSize, bufferSize)
 
 	readToIndex := 0
 
 	req := Request{
 		RequestLine: RequestLine{},
-		Headers: headers.Headers{},
-		State: requestStateInitialized,
+		Headers:     headers.Headers{},
+		State:       requestStateInitialized,
 	}
-	
+
 	for req.State != requestStateDone {
 		if (readToIndex + 1) >= len(buff) {
 			buff = append(buff, make([]byte, len(buff), cap(buff))...)
 		}
+		if conn, ok := reader.(net.Conn); ok {
+			conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+		}
 		n, err := reader.Read(buff[readToIndex:])
-		if n == 0 && err == io.EOF {
+		if ne, ok := err.(net.Error); (ok && ne.Timeout()) || (n == 0 && err == io.EOF) {
 			if req.State != requestStateParsingBody {
 				return nil, errors.New("No requestStateParsingBody after EOF.")
 			}
@@ -160,6 +165,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			req.State = requestStateDone
 			continue
 		}
+
 		readToIndex += n
 		if req.State != requestStateParsingBody {
 			n, err = req.parse(buff[:readToIndex])
@@ -172,6 +178,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			}
 		}
 	}
-	
+
 	return &req, nil
 }

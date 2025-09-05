@@ -1,22 +1,19 @@
 package main
 
 import (
-	"log"
 	"io"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"github.com/PavelVaavra/http-from-tcp/internal/server"
+
 	"github.com/PavelVaavra/http-from-tcp/internal/request"
 	"github.com/PavelVaavra/http-from-tcp/internal/response"
+	"github.com/PavelVaavra/http-from-tcp/internal/server"
 )
 
 const port = 42069
 
-// Back in main, create a handler function. Let's be sure to test our error handling:
-// If the request target (path) is /yourproblem return a 400 and the message "Your problem is not my problem\n"
-// If the request target (path) is /myproblem return a 500 and the message "Woopsie, my bad\n"
-// Otherwise, it should just write the string "All good, frfr\n" to the response body.
 func main() {
 	server, err := server.Serve(port, myHandler)
 	if err != nil {
@@ -32,25 +29,18 @@ func main() {
 }
 
 func myHandler(w io.Writer, req *request.Request) *server.HandlerError {
+	handlerError := server.HandlerError{}
 	switch req.RequestLine.RequestTarget {
 	case "/yourproblem":
-		return &server.HandlerError{
-			StatusCode: response.StatusCodeBadRequest,
-			Message: "Your problem is not my problem",
-		}
+		handlerError.StatusCode = response.StatusCodeBadRequest
+		handlerError.Message = "Your problem is not my problem\n"
 	case "/myproblem":
-		return &server.HandlerError{
-			StatusCode: response.StatusCodeInternalServerError,
-			Message: "Woopsie, my bad",
-		}
+		handlerError.StatusCode = response.StatusCodeInternalServerError
+		handlerError.Message = "Woopsie, my bad\n"
 	default:
-		w.Write([]byte("All good, frfr\n"))
-		return &server.HandlerError{
-			StatusCode: response.StatusCodeOK,
-			Message: "OK",
-		}
+		handlerError.StatusCode = response.StatusCodeOK
+		handlerError.Message = "All good, frfr\n"
 	}
+	w.Write([]byte(handlerError.Message))
+	return &handlerError
 }
-
-// printf "GET /ahoj HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/8.5.0\r\nAccept: */*\r\n\r\n" | nc localhost 42069
-// printf "GET /ahoj HTTP/1.1\r\nHost: localhost:42069\r\nConnection: close\r\n\r\n" | nc localhost 42069

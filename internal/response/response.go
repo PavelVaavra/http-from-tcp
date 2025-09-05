@@ -1,28 +1,29 @@
 package response
 
 import (
-	"io"
 	"fmt"
+	"io"
+
 	"github.com/PavelVaavra/http-from-tcp/internal/headers"
 )
 
 type StatusCode int
 
 const (
-	StatusCodeOK StatusCode = 200
-	StatusCodeBadRequest StatusCode = 400
-	StatusCodeInternalServerError StatusCode = 500 
+	StatusCodeOK                  StatusCode = 200
+	StatusCodeBadRequest          StatusCode = 400
+	StatusCodeInternalServerError StatusCode = 500
 )
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode, message string) error {
+func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
 	statusLine := ""
 	switch statusCode {
 	case StatusCodeOK:
 		statusLine = "HTTP/1.1 200 OK\r\n"
 	case StatusCodeBadRequest:
-		statusLine = "HTTP/1.1 400 " + message + "\r\n"
+		statusLine = "HTTP/1.1 400 Bad Request\r\n"
 	case StatusCodeInternalServerError:
-		statusLine = "HTTP/1.1 500 " + message + "\r\n"
+		statusLine = "HTTP/1.1 500 Internal Server Error\r\n"
 	}
 	_, err := w.Write([]byte(statusLine))
 	return err
