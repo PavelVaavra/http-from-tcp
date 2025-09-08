@@ -21,6 +21,7 @@ type HandlerError struct {
 type Server struct {
 	State    atomic.Bool //0..closed, 1..open
 	Listener net.Listener
+	Handler  Handler
 }
 
 func Serve(port int, handler Handler) (*Server, error) {
@@ -30,9 +31,10 @@ func Serve(port int, handler Handler) (*Server, error) {
 	}
 	server := Server{
 		Listener: l,
+		Handler:  handler,
 	}
 	server.State.Store(true)
-	go server.listen(handler)
+	go server.listen()
 
 	return &server, nil
 }
@@ -46,7 +48,7 @@ func (s *Server) Close() error {
 	return nil
 }
 
-func (s *Server) listen(handler Handler) {
+func (s *Server) listen() {
 	for {
 		// Wait for a connection.
 		conn, err := s.Listener.Accept()
@@ -59,11 +61,11 @@ func (s *Server) listen(handler Handler) {
 			}
 		}
 		fmt.Println("A connection has been accepted...")
-		go s.handle(conn, handler)
+		go s.handle(conn)
 	}
 }
 
-func (s *Server) handle(conn net.Conn, handler Handler) {
+func (s *Server) handle(conn net.Conn) {
 	req, err := request.RequestFromReader(conn)
 	if err != nil {
 		fmt.Printf("could not parse HTTP request: error:%v\n", err.Error())
@@ -71,7 +73,7 @@ func (s *Server) handle(conn net.Conn, handler Handler) {
 	}
 
 	var b bytes.Buffer
-	handlerError := handler(&b, req)
+	handlerError := s.Handler(&b, req)
 
 	err = response.WriteStatusLine(conn, handlerError.StatusCode)
 	if err != nil {
