@@ -1,9 +1,7 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"net"
 	"sync/atomic"
 
@@ -11,12 +9,7 @@ import (
 	"github.com/PavelVaavra/http-from-tcp/internal/response"
 )
 
-type Handler func(w io.Writer, req *request.Request) *HandlerError
-
-type HandlerError struct {
-	StatusCode response.StatusCode
-	Message    string
-}
+type Handler func(w *response.Writer, req *request.Request)
 
 type Server struct {
 	State    atomic.Bool //0..closed, 1..open
@@ -72,25 +65,10 @@ func (s *Server) handle(conn net.Conn) {
 		return
 	}
 
-	var b bytes.Buffer
-	handlerError := s.Handler(&b, req)
-
-	err = response.WriteStatusLine(conn, handlerError.StatusCode)
-	if err != nil {
-		return
+	w := response.Writer{
+		Conn: conn,
 	}
-
-	headers := response.GetDefaultHeaders(len(handlerError.Message))
-
-	err = response.WriteHeaders(conn, headers)
-	if err != nil {
-		return
-	}
-
-	_, err = conn.Write(b.Bytes())
-	if err != nil {
-		return
-	}
+	s.Handler(&w, req)
 
 	conn.Close()
 	fmt.Println("A connection has been closed...")

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -15,7 +14,7 @@ import (
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, myHandler)
+	server, err := server.Serve(port, textHandler)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -28,19 +27,43 @@ func main() {
 	log.Println("Server gracefully stopped")
 }
 
-func myHandler(w io.Writer, req *request.Request) *server.HandlerError {
-	handlerError := server.HandlerError{}
+func textHandler(w *response.Writer, req *request.Request) {
 	switch req.RequestLine.RequestTarget {
 	case "/yourproblem":
-		handlerError.StatusCode = response.StatusCodeBadRequest
-		handlerError.Message = "Your problem is not my problem\n"
+		w.StatusCode = response.StatusCodeBadRequest
+		w.Message = "Your problem is not my problem\n"
 	case "/myproblem":
-		handlerError.StatusCode = response.StatusCodeInternalServerError
-		handlerError.Message = "Woopsie, my bad\n"
+		w.StatusCode = response.StatusCodeInternalServerError
+		w.Message = "Woopsie, my bad\n"
 	default:
-		handlerError.StatusCode = response.StatusCodeOK
-		handlerError.Message = "All good, frfr\n"
+		w.StatusCode = response.StatusCodeOK
+		w.Message = "All good, frfr\n"
 	}
-	w.Write([]byte(handlerError.Message))
-	return &handlerError
+	w.Write()
 }
+
+// -------------------
+// HTTP/1.1 500 Internal Server Error
+// content-type: text/plain
+// content-length: 16
+// connection: close
+//
+// Woopsie, my bad
+// -------------------
+
+// -------------------
+// HTTP/1.1 500 Internal Server Error
+// content-type: text/html
+// content-length: 16
+// connection: close
+//
+// <html>
+//   <head>
+//     <title>500 Internal Server Error</title>
+//   </head>
+//   <body>
+//     <h1>Internal Server Error</h1>
+//     <p>Okay, you know what? This one is on me.</p>
+//   </body>
+// </html>
+// -------------------

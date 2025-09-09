@@ -3,9 +3,36 @@ package response
 import (
 	"fmt"
 	"io"
+	"net"
+	"strconv"
 
 	"github.com/PavelVaavra/http-from-tcp/internal/headers"
 )
+
+type Writer struct {
+	StatusCode StatusCode
+	Message    string
+	Conn       net.Conn
+}
+
+func (w *Writer) Write() {
+	err := WriteStatusLine(w.Conn, w.StatusCode)
+	if err != nil {
+		return
+	}
+
+	headers := GetDefaultHeaders(len(w.Message))
+
+	err = WriteHeaders(w.Conn, headers)
+	if err != nil {
+		return
+	}
+
+	_, err = w.Conn.Write([]byte(w.Message))
+	if err != nil {
+		return
+	}
+}
 
 type StatusCode int
 
@@ -15,16 +42,14 @@ const (
 	StatusCodeInternalServerError StatusCode = 500
 )
 
+var statusPhrase = map[StatusCode]string{
+	200: "OK",
+	400: "Bad Request",
+	500: "Internal Server Error",
+}
+
 func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
-	statusLine := ""
-	switch statusCode {
-	case StatusCodeOK:
-		statusLine = "HTTP/1.1 200 OK\r\n"
-	case StatusCodeBadRequest:
-		statusLine = "HTTP/1.1 400 Bad Request\r\n"
-	case StatusCodeInternalServerError:
-		statusLine = "HTTP/1.1 500 Internal Server Error\r\n"
-	}
+	statusLine := "HTTP/1.1 " + strconv.Itoa(int(statusCode)) + " " + statusPhrase[statusCode] + "\r\n"
 	_, err := w.Write([]byte(statusLine))
 	return err
 }
