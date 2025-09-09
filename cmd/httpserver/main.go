@@ -14,7 +14,7 @@ import (
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, textHandler)
+	server, err := server.Serve(port, htmlHandler)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -42,28 +42,41 @@ func textHandler(w *response.Writer, req *request.Request) {
 	w.Write()
 }
 
-// -------------------
-// HTTP/1.1 500 Internal Server Error
-// content-type: text/plain
-// content-length: 16
-// connection: close
-//
-// Woopsie, my bad
-// -------------------
-
-// -------------------
-// HTTP/1.1 500 Internal Server Error
-// content-type: text/html
-// content-length: 16
-// connection: close
-//
-// <html>
-//   <head>
-//     <title>500 Internal Server Error</title>
-//   </head>
-//   <body>
-//     <h1>Internal Server Error</h1>
-//     <p>Okay, you know what? This one is on me.</p>
-//   </body>
-// </html>
-// -------------------
+func htmlHandler(w *response.Writer, req *request.Request) {
+	switch req.RequestLine.RequestTarget {
+	case "/yourproblem":
+		w.StatusCode = response.StatusCodeBadRequest
+		w.Message = `<html>
+  <head>
+    <title>%s %s</title>
+  </head>
+  <body>
+    <h1>%s</h1>
+    <p>Your request honestly kinda sucked.</p>
+  </body>
+</html>`
+	case "/myproblem":
+		w.StatusCode = response.StatusCodeInternalServerError
+		w.Message = `<html>
+  <head>
+    <title>%s %s</title>
+  </head>
+  <body>
+    <h1>%s</h1>
+    <p>Okay, you know what? This one is on me.</p>
+  </body>
+</html>`
+	default:
+		w.StatusCode = response.StatusCodeOK
+		w.Message = `<html>
+  <head>
+    <title>%s %s</title>
+  </head>
+  <body>
+    <h1>%s</h1>
+    <p>Your request was an absolute banger.</p>
+  </body>
+</html>`
+	}
+	w.Write()
+}

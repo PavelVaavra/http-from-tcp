@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/PavelVaavra/http-from-tcp/internal/headers"
 )
@@ -16,12 +17,23 @@ type Writer struct {
 }
 
 func (w *Writer) Write() {
-	err := WriteStatusLine(w.Conn, w.StatusCode)
+	statusCodeStr := strconv.Itoa(int(w.StatusCode))
+	statusPhraseStr := statusPhrase[statusCodeStr]
+
+	err := WriteStatusLine(w.Conn, statusCodeStr, statusPhraseStr)
 	if err != nil {
 		return
 	}
 
-	headers := GetDefaultHeaders(len(w.Message))
+	isHtml := strings.Contains(w.Message, "<html>")
+
+	contentType := "plain"
+	if isHtml {
+		contentType = "html"
+		w.Message = fmt.Sprintf(w.Message, statusCodeStr, statusPhraseStr, statusPhraseStr)
+	}
+
+	headers := GetDefaultHeaders(len(w.Message), contentType)
 
 	err = WriteHeaders(w.Conn, headers)
 	if err != nil {
@@ -42,23 +54,23 @@ const (
 	StatusCodeInternalServerError StatusCode = 500
 )
 
-var statusPhrase = map[StatusCode]string{
-	200: "OK",
-	400: "Bad Request",
-	500: "Internal Server Error",
+var statusPhrase = map[string]string{
+	"200": "OK",
+	"400": "Bad Request",
+	"500": "Internal Server Error",
 }
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
-	statusLine := "HTTP/1.1 " + strconv.Itoa(int(statusCode)) + " " + statusPhrase[statusCode] + "\r\n"
+func WriteStatusLine(w io.Writer, statusCode string, statusPhrase string) error {
+	statusLine := "HTTP/1.1 " + statusCode + " " + statusPhrase + "\r\n"
 	_, err := w.Write([]byte(statusLine))
 	return err
 }
 
-func GetDefaultHeaders(contentLen int) headers.Headers {
+func GetDefaultHeaders(contentLen int, contentType string) headers.Headers {
 	headers := headers.Headers{}
 	headers.Set("Content-Length", fmt.Sprintf("%v", contentLen))
 	headers.Set("Connection", "close")
-	headers.Set("Content-Type", "text/plain")
+	headers.Set("Content-Type", fmt.Sprintf("text/%v", contentType))
 
 	return headers
 }
