@@ -3,3 +3,4 @@ tcplistener
 /udpsender
 /main.go
 .vscode
+assets

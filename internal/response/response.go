@@ -66,3 +66,22 @@ func (w *Writer) WriteChunkedBodyDone() error {
 	_, err := w.Conn.Write([]byte("0\r\n\r\n"))
 	return err
 }
+
+func (w *Writer) WriteTrailers() error {
+	_, err := w.Conn.Write([]byte("0\r\n"))
+	if err != nil {
+		return err
+	}
+	for k, v := range w.Trailers {
+		trailer := k + ": " + v + "\r\n"
+		_, err := w.Conn.Write([]byte(trailer))
+		if err != nil {
+			return err
+		}
+	}
+	_, err = w.Conn.Write([]byte("\r\n"))
+	if err != nil {
+		return err
+	}
+	return nil
+}

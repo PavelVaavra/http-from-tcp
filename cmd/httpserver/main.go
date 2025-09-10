@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
@@ -20,7 +21,7 @@ import (
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, chunkHandler)
+	server, err := server.Serve(port, chunkHandlerTrailers)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -137,6 +138,7 @@ func chunkHandler(w *response.Writer, req *request.Request) {
 	w.WriteHeaders()
 
 	buff := make([]byte, 1024)
+	totalBytes := 0
 	for {
 		n, err := w.BodyChunked.Read(buff)
 		if n == 0 && err == io.EOF {
@@ -146,9 +148,60 @@ func chunkHandler(w *response.Writer, req *request.Request) {
 		if err != nil {
 			fmt.Errorf("w.WriteChunkedBody: err - %v\n", err.Error())
 		}
+		totalBytes += n
 	}
-	w.WriteChunkedBodyDone()
+	err = w.WriteChunkedBodyDone()
 	if err != nil {
 		fmt.Errorf("w.WriteChunkedBodyDone: err - %v\n", err.Error())
 	}
+}
+
+func chunkHandlerTrailers(w *response.Writer, req *request.Request) {
+	url := "https://httpbin.org"
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
+		url += strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin")
+	}
+
+	res, err := http.Get(url)
+	if err != nil {
+		fmt.Errorf("http.Get(\"%v\" err - %v\n", url, err.Error())
+	}
+	defer res.Body.Close()
+
+	w.StatusCode = response.StatusCode(res.StatusCode)
+	w.StatusPhrase = strings.Split(res.Status, " ")[1]
+	w.BodyChunked = res.Body
+
+	w.Headers = headers.Headers{
+		"Connection":        "close",
+		"Transfer-Encoding": "chunked",
+		"Content-Type":      "text/plain",
+		"Trailer":           "X-Content-SHA256, X-Content-Length",
+	}
+
+	w.WriteStatusLine()
+	w.WriteHeaders()
+
+	buff := make([]byte, 1024)
+	var body []byte
+	totalBytes := 0
+	for {
+		n, err := w.BodyChunked.Read(buff)
+		if n == 0 && err == io.EOF {
+			break
+		}
+		body = append(body, buff[:n]...)
+		err = w.WriteChunkedBody(buff[:n])
+		if err != nil {
+			fmt.Errorf("w.WriteChunkedBody: err - %v\n", err.Error())
+		}
+		totalBytes += n
+	}
+
+	w.Trailers = headers.Headers{
+		"X-Content-SHA256": fmt.Sprintf("%x", sha256.Sum256(body)),
+		"X-Content-Length": strconv.Itoa(totalBytes),
+	}
+
+	w.WriteTrailers()
 }
