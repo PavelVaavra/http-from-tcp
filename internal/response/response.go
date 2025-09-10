@@ -1,6 +1,7 @@
 package response
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -49,5 +50,19 @@ func (w *Writer) WriteHeaders() error {
 
 func (w *Writer) WriteBody() error {
 	_, err := w.Conn.Write([]byte(w.BodyText))
+	return err
+}
+
+func (w *Writer) WriteChunkedBody(p []byte) error {
+	chunk := []byte(fmt.Sprintf("%X", len(p)))
+	chunk = append(chunk, []byte("\r\n")...)
+	chunk = append(chunk, p...)
+	chunk = append(chunk, []byte("\r\n")...)
+	_, err := w.Conn.Write(chunk)
+	return err
+}
+
+func (w *Writer) WriteChunkedBodyDone() error {
+	_, err := w.Conn.Write([]byte("0\r\n\r\n"))
 	return err
 }

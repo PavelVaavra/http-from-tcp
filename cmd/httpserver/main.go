@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/PavelVaavra/http-from-tcp/internal/headers"
@@ -17,7 +20,7 @@ import (
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, htmlHandler)
+	server, err := server.Serve(port, chunkHandler)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -108,49 +111,44 @@ func htmlHandler(w *response.Writer, req *request.Request) {
 	w.WriteBody()
 }
 
-// func chunkHandler(w *response.Writer, req *request.Request) {
-// 	url := "https://httpbin.org"
-// 	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
-// 		url += strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin")
-// 	}
+func chunkHandler(w *response.Writer, req *request.Request) {
+	url := "https://httpbin.org"
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
+		url += strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin")
+	}
 
-// 	res, err := http.Get(url)
-// 	if err != nil {
-// 		fmt.Errorf("http.Get(\"%v\" err - %v\n", url, err.Error())
-// 	}
-// 	defer res.Body.Close()
+	res, err := http.Get(url)
+	if err != nil {
+		fmt.Errorf("http.Get(\"%v\" err - %v\n", url, err.Error())
+	}
+	defer res.Body.Close()
 
-// 	w.StatusCode = response.StatusCode(res.StatusCode)
+	w.StatusCode = response.StatusCode(res.StatusCode)
+	w.StatusPhrase = strings.Split(res.Status, " ")[1]
+	w.BodyChunked = res.Body
 
-// 	w.WriteChunked(res.Body)
-// }
+	w.Headers = headers.Headers{
+		"Connection":        "close",
+		"Transfer-Encoding": "chunked",
+		"Content-Type":      "text/plain",
+	}
 
-// Add a new proxy handler to your server that maps /httpbin/x to https://httpbin.org/x, supporting both proxying and chunked responsing.
+	w.WriteStatusLine()
+	w.WriteHeaders()
 
-// 	I used the strings.HasPrefix and strings.TrimPrefix functions to handle routing and route parsing.
-
-// 	Be sure to remove the Content-Length header from the response, and add the Transfer-Encoding: chunked header.
-
-// 	I used http.Get to make the request to httpbin.org and resp.Body.Read to read the response body. I used a buffer size of 1024 bytes, and then
-// 	printed n on every call to Read so that I could see how much data was being read. Use n as your chunk size and write that chunk data back to the
-// 	client as soon as you get it from httpbin.org. It's pretty cool to see how the data can be forwarded in real-time!
-
-// 	I recommend using netcat to test your chunked responses. Curl will abstract away the chunking for you, so you won't see your hex and cr and lf
-// 	characters in your terminal if you use curl. I used this command to see my raw chunked response:
-
-// echo -e "GET /httpbin/stream/100 HTTP/1.1\r\nHost: localhost:42069\r\nConnection: close\r\n\r\n" | nc localhost 42069
-
-// GET localhost:42069/httpbin/stream/100 will trigger a handler on our server that sends a request to https://httpbin.org/stream/100
-// and then forwards the response back to the client chunk by chunk.
-
-// HTTP/1.1 200 OK
-// Content-Type: text/plain
-// Transfer-Encoding: chunked
-
-// 1E
-// I could go for a cup of coffee
-// B
-// But not Java
-// 12
-// Never go full Java
-// 0
+	buff := make([]byte, 1024)
+	for {
+		n, err := w.BodyChunked.Read(buff)
+		if n == 0 && err == io.EOF {
+			break
+		}
+		err = w.WriteChunkedBody(buff[:n])
+		if err != nil {
+			fmt.Errorf("w.WriteChunkedBody: err - %v\n", err.Error())
+		}
+	}
+	w.WriteChunkedBodyDone()
+	if err != nil {
+		fmt.Errorf("w.WriteChunkedBodyDone: err - %v\n", err.Error())
+	}
+}
