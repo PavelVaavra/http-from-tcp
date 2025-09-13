@@ -23,6 +23,7 @@ type Writer struct {
 	Headers      headers.Headers
 	BodyText     string
 	BodyChunked  io.ReadCloser
+	BodyVideo    []byte
 	Trailers     headers.Headers
 	Conn         net.Conn
 }
@@ -50,6 +51,11 @@ func (w *Writer) WriteHeaders() error {
 
 func (w *Writer) WriteBody() error {
 	_, err := w.Conn.Write([]byte(w.BodyText))
+	return err
+}
+
+func (w *Writer) WriteBodyVideo() error {
+	_, err := w.Conn.Write(w.BodyVideo)
 	return err
 }
 

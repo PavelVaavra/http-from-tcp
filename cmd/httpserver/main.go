@@ -21,7 +21,7 @@ import (
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, chunkHandlerTrailers)
+	server, err := server.Serve(port, videoHandler)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -120,7 +120,7 @@ func chunkHandler(w *response.Writer, req *request.Request) {
 
 	res, err := http.Get(url)
 	if err != nil {
-		fmt.Errorf("http.Get(\"%v\" err - %v\n", url, err.Error())
+		fmt.Printf("http.Get(\"%v\" err - %v\n", url, err.Error())
 	}
 	defer res.Body.Close()
 
@@ -146,13 +146,13 @@ func chunkHandler(w *response.Writer, req *request.Request) {
 		}
 		err = w.WriteChunkedBody(buff[:n])
 		if err != nil {
-			fmt.Errorf("w.WriteChunkedBody: err - %v\n", err.Error())
+			fmt.Printf("w.WriteChunkedBody: err - %v\n", err.Error())
 		}
 		totalBytes += n
 	}
 	err = w.WriteChunkedBodyDone()
 	if err != nil {
-		fmt.Errorf("w.WriteChunkedBodyDone: err - %v\n", err.Error())
+		fmt.Printf("w.WriteChunkedBodyDone: err - %v\n", err.Error())
 	}
 }
 
@@ -164,7 +164,7 @@ func chunkHandlerTrailers(w *response.Writer, req *request.Request) {
 
 	res, err := http.Get(url)
 	if err != nil {
-		fmt.Errorf("http.Get(\"%v\" err - %v\n", url, err.Error())
+		fmt.Printf("http.Get(\"%v\" err - %v\n", url, err.Error())
 	}
 	defer res.Body.Close()
 
@@ -175,7 +175,7 @@ func chunkHandlerTrailers(w *response.Writer, req *request.Request) {
 	w.Headers = headers.Headers{
 		"Connection":        "close",
 		"Transfer-Encoding": "chunked",
-		"Content-Type":      "text/plain",
+		"Content-Type":      "text/html`",
 		"Trailer":           "X-Content-SHA256, X-Content-Length",
 	}
 
@@ -193,7 +193,7 @@ func chunkHandlerTrailers(w *response.Writer, req *request.Request) {
 		body = append(body, buff[:n]...)
 		err = w.WriteChunkedBody(buff[:n])
 		if err != nil {
-			fmt.Errorf("w.WriteChunkedBody: err - %v\n", err.Error())
+			fmt.Printf("w.WriteChunkedBody: err - %v\n", err.Error())
 		}
 		totalBytes += n
 	}
@@ -204,4 +204,27 @@ func chunkHandlerTrailers(w *response.Writer, req *request.Request) {
 	}
 
 	w.WriteTrailers()
+}
+
+func videoHandler(w *response.Writer, req *request.Request) {
+	if req.RequestLine.RequestTarget == "/video" {
+		w.StatusCode = response.StatusCodeOK
+		w.StatusPhrase = "OK"
+
+		data, err := os.ReadFile("assets/vim.mp4")
+		if err != nil {
+			fmt.Printf("os.ReadFile(\"../../assets/vim.mp4\"): %v\n", err.Error())
+		}
+		w.BodyVideo = data
+	}
+
+	w.Headers = headers.Headers{
+		"Connection":     "close",
+		"Content-Length": fmt.Sprintf("%v", len(w.BodyVideo)),
+		"Content-Type":   "video/mp4",
+	}
+
+	w.WriteStatusLine()
+	w.WriteHeaders()
+	w.WriteBodyVideo()
 }
